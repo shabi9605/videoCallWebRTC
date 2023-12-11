@@ -35,6 +35,16 @@ function webSocketOnMessage(event){
         return;
     }
 
+    if(action == 'new-answer'){
+        var answer = parsedData['message']['sdp'];
+
+        var peer = mapPeers[peerUsername][0];
+
+        peer.setRemoteDescription(answer)
+
+        return;
+    }
+
     
 }
 
@@ -97,15 +107,71 @@ const constraints = {
 
 const localVideo = document.querySelector("#local-video");
 
+const btnToggleAudio = document.querySelector("#btn-toggle-audio");
+const btnToggleVideo = document.querySelector("#btn-toggle-video");
+
 var userMedia = navigator.mediaDevices.getUserMedia(constraints)
     .then(stream => {
         localStream = stream;
         localVideo.srcObject = localStream;
         localVideo.muted = true;
+
+        var audioTracks = stream.getAudioTracks();
+        var videoTracks = stream.getVideoTracks();
+
+        audioTracks[0].enabled = true;
+        videoTracks[0].enabled = true;
+
+        btnToggleAudio.addEventListener('click', () => {
+            audioTracks[0].enabled = !audioTracks[0].enabled;
+
+            if(audioTracks[0].enabled){
+                btnToggleAudio.innerHTML = 'Audio Mute';
+                return;
+            }
+            btnToggleAudio.innerHTML = 'Audio Unmute';
+        });
+
+        btnToggleVideo.addEventListener('click', () => {
+            videoTracks[0].enabled = !videoTracks[0].enabled;
+
+            if(videoTracks[0].enabled){
+                btnToggleVideo.innerHTML = 'Video Off';
+                return;
+            }
+            btnToggleVideo.innerHTML = 'Video On';
+        })
     })
     .catch(error => {
         console.log("Error accessing media devices. ",error);
     });
+
+
+var btnSendMsg = document.querySelector('#btn-send-msg');
+var messageList = document.querySelector('#message-list');
+
+var messageInput = document.querySelector("#msg")
+
+btnSendMsg.addEventListener('click', sendMsgOnClick);
+
+function sendMsgOnClick(){
+    var message = messageInput.value;
+
+    var li = document.createElement('li');
+    li.appendChild(document.createTextNode('Me: '+message));
+    messageList.appendChild(li);
+
+    var dataChannels = getDataChannels();
+
+    message = username + ': '+ message;
+
+    for(index in dataChannels){
+        dataChannels[index].send(message);
+    }
+
+    messageInput.value = '';
+
+}
 
 
     
@@ -183,7 +249,7 @@ function creteAnswerer(offer, peerUsername,receiver_channel_name){
     var remoteVideo = createVideo(peerUsername);
     setOnTrack(peer, remoteVideo);
 
-    peer.addEventListener('dataChannel', e => {
+    peer.addEventListener('datachannel', e => {
         peer.dc = e.channel;
         peer.dc.addEventListener('open', () => {
             console.log("Connection opened!");
@@ -227,10 +293,11 @@ function creteAnswerer(offer, peerUsername,receiver_channel_name){
     peer.setRemoteDescription(offer)
         .then(() => {
             console.log('Remote description set successfully for %s.', peerUsername);
-            peer.createAnswer();
+            return peer.createAnswer();
         })
         .then(a => {
             console.log('Answer created')
+            peer.setLocalDescription(a)
         })
 
     
@@ -245,7 +312,7 @@ function addLocalTracks(peer){
     return;
 }
 
-var messageList = document.querySelector('#message-list');
+
 
 function dcOnMessage(event){
     var message = event.data;
@@ -285,4 +352,16 @@ function remoteVideo(remoteVideo){
     var videoWrapper = video.parentNode;
 
     videoWrapper.parentNode.removeChild(videoWrapper);
+}
+
+function getDataChannels(){
+    var dataChannels = [];
+
+    for(peerUsername in mapPeers){
+        var dataChannel = mapPeers[peerUsername][1];
+
+        dataChannels.push(dataChannel);
+    }
+
+    return dataChannels;
 }
