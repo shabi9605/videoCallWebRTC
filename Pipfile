@@ -12,7 +12,7 @@ django-environ = "*"
 django-extensions = "*"
 gunicorn = "*"
 ipython = "*"
-psycopg2 = "*"
+channels = "*"
 
 [dev-packages]
 yapf = "*"
